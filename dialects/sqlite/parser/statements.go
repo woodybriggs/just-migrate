@@ -1,0 +1,47 @@
+package sqlite
+
+import (
+	"errors"
+	"os"
+	"runtime/debug"
+	"woodybriggs/justmigrate/core/ast"
+	"woodybriggs/justmigrate/core/tik"
+)
+
+func (p *SqliteParser) Statements() []ast.Statement {
+	statements := []ast.Statement{}
+
+	for !p.EndOfFile() {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					if err, isErr := r.(error); isErr && errors.Is(err, ErrNotImplemented) {
+						debug.PrintStack()
+						os.Exit(2)
+					}
+					p.Synchronize([]tik.TokenKind{';'})
+				}
+			}()
+
+			statement := p.Statement()
+			statements = append(statements, statement)
+
+			// if this fails/panics, the defer block above handles it too.
+			p.Expect(';')
+		}()
+	}
+
+	return statements
+}
+
+func (p *SqliteParser) Statement() ast.Statement {
+	p.PushParseContext("statement")
+	defer p.PopParseContext()
+
+	switch p.Current().Kind {
+	case tik.TokenKind_Keyword_CREATE:
+		return p.CreateStatement()
+	default:
+		panic("not implemented")
+	}
+}
