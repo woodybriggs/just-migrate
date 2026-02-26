@@ -183,6 +183,97 @@ func (p *SqliteParser) IndexedColumn(allowExpressions bool) ast.IndexedColumn {
 	}
 }
 
+func (p *SqliteParser) TableConstraint_ForeignKey(constraintName *ast.ConstraintName) ast.TableConstraint {
+	p.PushParseContext("foreign key table constraint")
+	defer p.PopParseContext()
+
+	foreign := ast.Keyword(p.Expect(tik.TokenKind_Keyword_FOREIGN))
+	key := ast.Keyword(p.Expect(tik.TokenKind_Keyword_KEY))
+
+	lParen := p.Expect('(')
+
+	columnNames := []ast.Identifier{}
+	for !p.EndOfFile() {
+		if p.Current().Kind == ',' {
+			p.Advance()
+			continue
+		} else if p.Current().Kind == ')' {
+			break
+		} else {
+			columnName := p.Identifier()
+			columnNames = append(columnNames, columnName)
+		}
+	}
+
+	rParen := p.Expect(')')
+
+	fkClause := p.ForeignKeyClause()
+	return ast.MakeTableConstraintForeignKey(
+		constraintName,
+		foreign,
+		key,
+		lParen,
+		columnNames,
+		rParen,
+		fkClause,
+	)
+}
+
+func (p *SqliteParser) ForeignKeyClause() *ast.ForeignKeyClause {
+
+	referencesKeyword := ast.Keyword(p.Expect(tik.TokenKind_Keyword_REFERENCES))
+
+	foreignTable := p.CatalogObjectIdentifier()
+
+	lParen := p.Expect('(')
+
+	columns := []ast.Identifier{}
+
+	for !p.EndOfFile() {
+		if p.Current().Kind == ',' {
+			p.Advance()
+			continue
+		} else if p.Current().Kind == ')' {
+			break
+		} else {
+			column := p.Identifier()
+			columns = append(columns, column)
+		}
+	}
+
+	rParen := p.Expect(')')
+
+	var deferrable *ast.ForeignKeyDeferrable = nil
+	var matchName *ast.Identifier = nil
+	actions := []ast.ForeignKeyActionTrigger{}
+
+	for !p.EndOfFile() {
+		if p.Current().Kind == TokenKind_Keyword_ON {
+			action := p.ForeignKeyAction()
+			actions = append(actions, action)
+		} else if p.Current().Kind == tik.TokenKind_Keyword_MATCH {
+			matchName = p.Identifier()
+		} else if p.Current().Kind == TokenKind_Keyword_NOT {
+			deferrable = p.ForeignKeyDeferrable()
+		} else if p.Current().Kind == tik.TokenKind_Keyword_DEFERRABLE {
+			deferrable = p.ForeignKeyDeferrable()
+		} else {
+			break
+		}
+	}
+
+	return ast.MakeForeignKeyClause(
+		referencesKeyword,
+		*foreignTable,
+		lParen,
+		columns,
+		rParen,
+		actions,
+		deferrable,
+		matchName,
+	)
+}
+
 func (p *SqliteParser) TableOptions() *ast.TableOptions {
 	panic("unimplemented")
 }

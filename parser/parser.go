@@ -632,19 +632,13 @@ func (p *Parser) IndexedColumn(allowExpressions bool) ast.IndexedColumn {
 		expr = &tmp
 	}
 
-	var collationName *ast.Identifier = nil
-	if p.CurrentToken.Kind == tik.TokenKind_Keyword_COLLATE {
-		p.Advance()
-		tmp := p.Identifier()
-		collationName = &tmp
-	}
-
+	collation := p.MaybeCollation()
 	order := p.MaybeOrderBy()
 
 	return ast.IndexedColumn{
-		Subject:       expr,
-		CollationName: collationName,
-		Order:         order,
+		Subject:   expr,
+		Collation: collation,
+		Order:     order,
 	}
 }
 
@@ -670,6 +664,16 @@ func (p *Parser) MaybeIfNotExists() *ast.IfNotExists {
 		Not:    *not,
 		Exists: *exists,
 	}
+}
+
+func (p *Parser) MaybeCollation() *ast.Collation {
+	if p.CurrentToken.Kind != tik.TokenKind_Keyword_COLLATE {
+		return nil
+	}
+	return ast.MakeCollation(
+		ast.Keyword(p.CurrentToken),
+		p.Identifier(),
+	)
 }
 
 func (p *Parser) CatalogObjectIdentifier() ast.CatalogObjectIdentifier {

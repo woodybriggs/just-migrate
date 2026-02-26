@@ -452,9 +452,9 @@ func (node *IndexedColumn) Eq(other *IndexedColumn) bool {
 
 	result = result && node.Subject.Eq(other.Subject)
 
-	if node.CollationName != nil && other.CollationName != nil {
-		result = result && node.CollationName.Eq(node.CollationName)
-	} else if node.CollationName != nil || other.CollationName != nil {
+	if node.Collation != nil && other.Collation != nil {
+		result = result && node.Collation.Name.Eq(&node.Collation.Name)
+	} else if node.Collation.Name.Eq(other.Collation.Name.AsExpr()) {
 		return false
 	}
 
@@ -827,9 +827,33 @@ func (node *TableConstraint_PrimaryKey) ToSql(f formatter.Formatter) {
 }
 
 type TableConstraint_ForeignKey struct {
-	Name     *ConstraintName
-	Columns  []Identifier
-	FkClause ForeignKeyClause
+	Name           *ConstraintName
+	ForeignKeyword Keyword
+	KeyKeyword     Keyword
+	LParen         tik.Token
+	Columns        []Identifier
+	RParen         tik.Token
+	FkClause       ForeignKeyClause
+}
+
+func MakeTableConstraintForeignKey(
+	constraintName *ConstraintName,
+	foreignKeyword Keyword,
+	keyKeyword Keyword,
+	lParen tik.Token,
+	columns []Identifier,
+	rParen tik.Token,
+	fkClause ForeignKeyClause,
+) *TableConstraint_ForeignKey {
+	return &TableConstraint_ForeignKey{
+		Name:           constraintName,
+		ForeignKeyword: foreignKeyword,
+		KeyKeyword:     keyKeyword,
+		LParen:         lParen,
+		Columns:        columns,
+		RParen:         rParen,
+		FkClause:       fkClause,
+	}
 }
 
 func (node *TableConstraint_ForeignKey) node()                {}
@@ -893,11 +917,36 @@ func (node *TableConstraint_ForeignKey) pairColumns() []IdentifierPair {
 }
 
 type ForeignKeyClause struct {
-	ForeignTable   CatalogObjectIdentifier
-	ForeignColumns []Identifier
-	Actions        []ForeignKeyActionTrigger
-	MatchName      *Identifier
-	Deferrable     *ForeignKeyDeferrable
+	ReferencesKeyword Keyword
+	ForeignTable      CatalogObjectIdentifier
+	LParen            tik.Token
+	ForeignColumns    []Identifier
+	RParen            tik.Token
+	Actions           []ForeignKeyActionTrigger
+	MatchName         *Identifier
+	Deferrable        *ForeignKeyDeferrable
+}
+
+func MakeForeignKeyClause(
+	referencesKeyword Keyword,
+	foreignTable CatalogObjectIdentifier,
+	lParen tik.Token,
+	foreignColumns []Identifier,
+	rParen tik.Token,
+	actions []ForeignKeyActionTrigger,
+	matchName *Identifier,
+	deferrable *ForeignKeyDeferrable,
+) *ForeignKeyClause {
+	return &ForeignKeyClause{
+		ReferencesKeyword: referencesKeyword,
+		ForeignTable:      foreignTable,
+		LParen:            lParen,
+		ForeignColumns:    foreignColumns,
+		RParen:            rParen,
+		Actions:           actions,
+		MatchName:         matchName,
+		Deferrable:        deferrable,
+	}
 }
 
 func (node *ForeignKeyClause) node() {}
